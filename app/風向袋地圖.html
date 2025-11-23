@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2.5D 物理風向袋 (木紋竿+加大版)</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #e0e0e0; overflow: hidden; }
+        
+        #map { width: 100%; height: 100%; z-index: 0; }
+
+        /* UI 面板樣式 */
+        .ui-panel {
+            position: absolute;
+            background: rgba(20, 20, 20, 0.85); 
+            backdrop-filter: blur(8px);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            z-index: 1000;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+
+        /* 左上：天氣資訊 */
+        #weather-panel { top: 20px; left: 20px; min-width: 200px; }
+        .date { font-size: 0.8rem; color: #aaa; margin-bottom: 5px; letter-spacing: 1px; }
+        .main-info { display: flex; align-items: center; gap: 15px; }
+        .icon { font-size: 2.5rem; }
+        .temp { font-size: 2.5rem; font-weight: bold; }
+        .desc { color: #ccc; font-size: 0.9rem; }
+        .coords { font-size: 0.75rem; color: #4facfe; margin-top: 5px; font-family: monospace; }
+
+        /* 左下：風力資訊 */
+        #wind-panel { 
+            top: auto;       
+            bottom: 30px;    
+            left: 20px;      
+            right: auto;     
+            text-align: left;
+            min-width: 180px; 
+        }
+
+        .label { font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .wind-dir { font-size: 1.8rem; font-weight: bold; color: #ff6b6b; margin: 5px 0; }
+        .wind-detail { font-size: 0.9rem; color: #ddd; }
+        
+        .wind-speed-block {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .wind-speed { 
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        .beaufort-scale {
+            font-size: 0.9rem;
+            color: #ffd93d; /* 黃色強調 */
+            margin-top: 2px;
+        }
+
+        /* 載入遮罩 */
+        #loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #333; z-index: 9999;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            color: white; transition: opacity 0.5s;
+        }
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid #555;
+            border-top: 4px solid #ff6b6b; border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 15px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* =========================================
+           核心 CSS: 2.5D 風向袋構造
+           ========================================= */
+        
+        .windsock-marker-root {
+            position: relative;
+            width: 0; height: 0;
+            perspective: 800px; 
+            pointer-events: none;
+        }
+
+        /* 竿子 (修改為木頭色) */
+        .pole {
+            position: absolute;
+            top: 0; left: 0;
+            width: 12px; height: 12px;
+            background: #5D4037; /* 深棕色底 */
+            border: 2px solid #3E2723; /* 更深的邊框 */
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+        .pole::after {
+            content: '';
+            position: absolute;
+            bottom: 50%; left: 50%;
+            width: 6px; 
+            height: 80px; /* 加高竿子以適應更大的風向袋 (原本50px) */
+            /* 木紋漸層效果 */
+            background: linear-gradient(to right, #4E342E, #8D6E63, #4E342E);
+            transform: translateX(-50%);
+            z-index: 1;
+        }
+
+        /* 旋轉軸 (位置調整配合新竿高) */
+        .pivot-arm {
+            position: absolute;
+            top: -80px; /* 對應竿子高度 */
+            left: 0;
+            width: 0; height: 0;
+            transform-style: preserve-3d;
+            transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* === 風向袋節段 (尺寸調整) === */
+        /* 計算邏輯：
+           寬度(Size) * 1.5
+           高度(Length) * 1.5 * 1.2 = 1.8 
+        */
+
+        .sock-segment {
+            position: absolute;
+            left: 50%;
+            transform-origin: center top;
+            transform-style: preserve-3d;
+            box-shadow: inset 3px 0 5px rgba(0,0,0,0.15), inset -3px 0 5px rgba(0,0,0,0.15);
+            transition: transform 1s cubic-bezier(0.25, 1, 0.5, 1);
+            backface-visibility: visible;
+        }
+
+        /* 第一節 */
+        .seg-1 {
+            top: 0;
+            width: 39px; /* 26 * 1.5 */
+            height: 54px; /* 30 * 1.8 */
+            background: linear-gradient(to bottom, #ff4757 50%, #f1f2f6 50%);
+            transform: translateX(-50%);
+            border-radius: 19.5px 19.5px 0 0; /* 配合寬度調整圓角 */
+            z-index: 3;
+        }
+
+        .sock-ring {
+            position: absolute;
+            top: -4px; left: 0;
+            width: 100%; height: 8px; /* 環也稍微加粗 */
+            background: #555;
+            border-radius: 50%;
+            z-index: 4;
+        }
+
+        /* 第二節 */
+        .seg-2 {
+            top: 54px; /* 接在 Seg-1 底部 */
+            width: 36px; /* 24 * 1.5 */
+            height: 54px; /* 30 * 1.8 */
+            background: linear-gradient(to bottom, #ff4757 50%, #f1f2f6 50%);
+            transform: translateX(-50%);
+            z-index: 2;
+        }
+
+        /* 第三節 */
+        .seg-3 {
+            top: 54px; /* 接在 Seg-2 底部 */
+            width: 33px; /* 22 * 1.5 */
+            height: 63px; /* 35 * 1.8 */
+            background: #ff4757;
+            transform: translateX(-50%);
+            border-radius: 0 0 16.5px 16.5px;
+            z-index: 1;
+            animation: flutter 0.3s infinite ease-in-out alternate;
+        }
+
+        .ground-shadow {
+            position: absolute;
+            top: 0; left: 0;
+            width: 36px; /* 陰影放大 */
+            height: 60px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 50%;
+            filter: blur(8px); /* 模糊半徑加大 */
+            transform-origin: center top;
+            transition: transform 1s, opacity 1s;
+            z-index: -1;
+        }
+
+        @keyframes flutter {
+            from { transform: translateX(-50%) rotateX(0deg) rotateZ(-2deg); }
+            to { transform: translateX(-50%) rotateX(5deg) rotateZ(2deg); }
+        }
+
+        /* 手機適配 */
+        @media (max-width: 600px) {
+            #weather-panel { top: 10px; left: 10px; right: 10px; min-width: unset; }
+            #wind-panel { 
+                top: unset; 
+                bottom: 30px; 
+                left: 10px; 
+                right: auto; 
+                background: rgba(30,30,30,0.9); 
+            }
+            .main-info { justify-content: space-between; }
+        }
+        
+        .leaflet-control-layers {
+            border: none !important;
+            border-radius: 8px !important;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2) !important;
+            font-family: 'Microsoft JhengHei', sans-serif;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <div>衛星定位中...</div>
+    </div>
+
+    <!-- UI 面板 -->
+    <div id="weather-panel" class="ui-panel">
+        <div class="date" id="date-text">--</div>
+        <div class="main-info">
+            <div class="icon" id="w-icon">📡</div>
+            <div>
+                <div class="temp"><span id="temp">--</span>°</div>
+                <div class="desc" id="w-desc">點擊地圖定位</div>
+            </div>
+        </div>
+        <div class="coords" id="coords-text"></div>
+    </div>
+
+    <div id="wind-panel" class="ui-panel">
+        <div class="label">WIND DIRECTION</div>
+        <div class="wind-dir" id="wind-dir-tw">--</div>
+        <div class="wind-detail"><span id="wind-deg">--</span>° <span id="wind-dir-en">--</span></div>
+        
+        <div class="wind-speed-block">
+            <div class="wind-speed">風速: <span id="wind-val">0</span> m/s</div>
+            <div class="beaufort-scale" id="beaufort-display">-- 級風</div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        let map;
+        let windsockMarker = null;
+
+        window.onload = function() {
+            initMap();
+        };
+
+        function initMap() {
+            const streetMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap'
+            });
+
+            const satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19,
+                attribution: '&copy; Esri'
+            });
+
+            map = L.map('map', { 
+                zoomControl: false, 
+                attributionControl: false,
+                layers: [streetMap] 
+            }).setView([23.6, 120.9], 8);
+
+            const baseMaps = {
+                "街道地圖 (亮色)": streetMap,
+                "衛星地圖": satelliteMap
+            };
+            L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            map.on('click', function(e) {
+                if (e && e.latlng) {
+                    placeWindsock(e.latlng.lat, e.latlng.lng);
+                }
+            });
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        if (pos && pos.coords && typeof pos.coords.latitude === 'number') {
+                            placeWindsock(pos.coords.latitude, pos.coords.longitude);
+                        } else {
+                            console.warn("定位回傳無效資料，使用預設值");
+                            placeWindsock(25.0330, 121.5654);
+                        }
+                    },
+                    (err) => {
+                        console.warn("定位失敗:", err);
+                        removeLoader();
+                        placeWindsock(25.0330, 121.5654); 
+                    }
+                );
+            } else {
+                placeWindsock(25.0330, 121.5654);
+            }
+        }
+
+        function removeLoader() {
+            const loader = document.getElementById('loader');
+            if(loader) {
+                loader.style.opacity = 0;
+                setTimeout(() => loader.remove(), 500);
+            }
+        }
+
+        function placeWindsock(lat, lng) {
+            let validLat = parseFloat(lat);
+            let validLng = parseFloat(lng);
+
+            if (!Number.isFinite(validLat) || !Number.isFinite(validLng)) {
+                console.warn("座標無效 (NaN/Inf):", lat, lng, "-> 重置為台北");
+                validLat = 25.0330; 
+                validLng = 121.5654;
+            }
+
+            lat = validLat;
+            lng = validLng;
+
+            if (windsockMarker) map.removeLayer(windsockMarker);
+            removeLoader();
+
+            document.getElementById('coords-text').innerText = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
+            const windsockIcon = L.divIcon({
+                className: 'custom-marker-container',
+                html: `
+                    <div class="windsock-marker-root">
+                        <div class="pole"></div>
+                        <div class="pivot-arm" id="marker-pivot">
+                            <div class="sock-segment seg-1" id="seg-1">
+                                <div class="sock-ring"></div>
+                                <div class="sock-segment seg-2" id="seg-2">
+                                    <div class="sock-segment seg-3" id="seg-3"></div>
+                                </div>
+                            </div>
+                            <div class="ground-shadow" id="marker-shadow"></div>
+                        </div>
+                    </div>
+                `,
+                iconSize: [0, 0],
+                iconAnchor: [0, 0]
+            });
+
+            windsockMarker = L.marker([lat, lng], { icon: windsockIcon }).addTo(map);
+
+            try {
+                map.invalidateSize(); 
+                map.flyTo([lat, lng], 15, { duration: 1.5 });
+            } catch (e) {
+                console.error("flyTo 動畫失敗，降級使用 setView:", e);
+                map.setView([lat, lng], 15);
+            }
+
+            fetchWeatherData(lat, lng);
+        }
+
+        async function fetchWeatherData(lat, lng) {
+            updateWindsockVisuals(0, 0); 
+            document.getElementById('w-desc').innerText = "讀取氣象資料...";
+
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&windspeed_unit=ms`;
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                const current = data.current_weather;
+
+                updateUI(current);
+                
+                setTimeout(() => {
+                    updateWindsockVisuals(current.winddirection, current.windspeed);
+                }, 100);
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('w-desc').innerText = "資料讀取失敗";
+            }
+        }
+
+        function updateWindsockVisuals(dirDegrees, speedMs) {
+            const pivot = document.getElementById('marker-pivot');
+            const seg1 = document.getElementById('seg-1');
+            const seg2 = document.getElementById('seg-2');
+            const seg3 = document.getElementById('seg-3');
+            const shadow = document.getElementById('marker-shadow');
+
+            if (!pivot || !seg1) return;
+
+            const targetAngle = dirDegrees; 
+            
+            pivot.style.transform = `rotateZ(${targetAngle}deg)`;
+
+            const maxSpeed = 15;
+            const ratio = Math.min(speedMs / maxSpeed, 1); 
+
+            const angle1 = -15 + (ratio * 15); 
+            const angle2 = -45 + (ratio * 45);
+            const angle3 = -40 + (ratio * 40);
+
+            seg1.style.transform = `translateX(-50%) rotateX(${angle1}deg)`;
+            seg2.style.transform = `translateX(-50%) rotateX(${angle2}deg)`;
+            seg3.style.transform = `translateX(-50%) rotateX(${angle3}deg)`;
+
+            const shadowLen = 0.6 + (ratio * 0.8);
+            const shadowOpac = 0.6 - (ratio * 0.3);
+            shadow.style.transform = `rotateX(90deg) scaleY(${shadowLen})`;
+            shadow.style.opacity = shadowOpac;
+
+            const flutterSpeed = 0.6 - (ratio * 0.45);
+            seg3.style.animationDuration = `${Math.max(flutterSpeed, 0.1)}s`;
+        }
+
+        function updateUI(data) {
+            const now = new Date();
+            document.getElementById('date-text').innerText = now.toLocaleString('zh-TW', { 
+                month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' 
+            });
+            document.getElementById('temp').innerText = Math.round(data.temperature);
+            
+            const w = getWeatherInfo(data.weathercode);
+            document.getElementById('w-desc').innerText = w.desc;
+            document.getElementById('w-icon').innerText = w.icon;
+            document.getElementById('wind-val').innerText = data.windspeed;
+            document.getElementById('wind-deg').innerText = data.winddirection;
+            
+            const dirs = getDirText(data.winddirection);
+            document.getElementById('wind-dir-tw').innerText = dirs.tw;
+            document.getElementById('wind-dir-en').innerText = dirs.en;
+
+            const beaufort = getBeaufortScale(data.windspeed);
+            const bElement = document.getElementById('beaufort-display');
+            bElement.innerText = `${beaufort.level} 級風 (${beaufort.desc})`;
+            if (beaufort.level >= 6) bElement.style.color = '#ff4757'; 
+            else bElement.style.color = '#ffd93d'; 
+        }
+
+        function getBeaufortScale(speed) {
+            if (speed < 0.5) return { level: 0, desc: "無風" };
+            if (speed <= 1.5) return { level: 1, desc: "軟風" };
+            if (speed <= 3.3) return { level: 2, desc: "輕風" };
+            if (speed <= 5.4) return { level: 3, desc: "微風" };
+            if (speed <= 7.9) return { level: 4, desc: "和風" };
+            if (speed <= 10.7) return { level: 5, desc: "清風" };
+            if (speed <= 13.8) return { level: 6, desc: "強風" };
+            if (speed <= 17.1) return { level: 7, desc: "疾風" };
+            if (speed <= 20.7) return { level: 8, desc: "大風" };
+            if (speed <= 24.4) return { level: 9, desc: "烈風" };
+            if (speed <= 28.4) return { level: 10, desc: "狂風" };
+            if (speed <= 32.6) return { level: 11, desc: "暴風" };
+            return { level: 12, desc: "颶風" };
+        }
+
+        function getWeatherInfo(code) {
+            if (code === 0) return { desc: "晴朗", icon: "☀️" };
+            if (code <= 3) return { desc: "多雲", icon: "⛅" };
+            if (code <= 48) return { desc: "霧", icon: "🌫️" };
+            if (code <= 67) return { desc: "雨天", icon: "🌧️" };
+            if (code <= 77) return { desc: "降雪", icon: "❄️" };
+            if (code <= 82) return { desc: "陣雨", icon: "🌦️" };
+            if (code <= 99) return { desc: "雷雨", icon: "⛈️" };
+            return { desc: "陰天", icon: "☁️" };
+        }
+
+        function getDirText(deg) {
+            const dirs = [
+                {en:"N", tw:"北"}, {en:"NNE", tw:"北北東"}, {en:"NE", tw:"東北"}, {en:"ENE", tw:"東北東"},
+                {en:"E", tw:"東"}, {en:"ESE", tw:"東南東"}, {en:"SE", tw:"東南"}, {en:"SSE", tw:"南南東"},
+                {en:"S", tw:"南"}, {en:"SSW", tw:"南南西"}, {en:"SW", tw:"西南"}, {en:"WSW", tw:"西南西"},
+                {en:"W", tw:"西"}, {en:"WNW", tw:"西北西"}, {en:"NW", tw:"西北"}, {en:"NNW", tw:"北北西"}
+            ];
+            const idx = Math.round(deg / 22.5) % 16;
+            return dirs[idx];
+        }
+    </script>
+</body>
+</html>
