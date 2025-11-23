@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>紫微斗數專業疊宮版 - 直書星曜與優化佈局</title>
+    <title>紫微斗數專業疊宮版 - 直書四化與三方四正</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
     
@@ -63,26 +63,26 @@
             padding: 4px;
         }
 
-        /* 中宮 (匯出入區) */
+        /* 中宮 (匯出入區 + 資訊區) */
         .center-area {
             grid-area: 2 / 2 / 4 / 4;
             background-color: #fcfcf7;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 1rem;
+            padding: 0.5rem;
             position: relative;
             z-index: 10;
             box-shadow: inset 0 0 20px rgba(0,0,0,0.03);
+            overflow: hidden;
         }
 
         .center-decor {
             position: absolute;
-            inset: 12px;
+            inset: 8px;
             border: 2px solid #d6d3d1;
             border-radius: 4px;
             pointer-events: none;
+            z-index: 0;
         }
 
         /* 單一宮位格 */
@@ -96,9 +96,16 @@
             border: 1px solid transparent;
             overflow: hidden;
             transition: all 0.2s;
+            cursor: pointer;
         }
 
         .palace-cell:hover {
+            box-shadow: inset 0 0 0 2px #b45309;
+            background-color: #fffbf0;
+        }
+        
+        .palace-cell.selected {
+            background-color: #fffbeb;
             box-shadow: inset 0 0 0 2px #b45309;
         }
 
@@ -156,7 +163,7 @@
             padding-bottom: 1.4rem;
         }
 
-        /* 星曜本體 (宮位內) - 改為直書 */
+        /* 星曜本體 (宮位內) - 直書 */
         .star-item {
             writing-mode: vertical-rl; /* 直書核心 */
             text-orientation: upright; /* 文字正立 */
@@ -172,6 +179,7 @@
             transition: transform 0.1s;
             letter-spacing: 1px;
             border-radius: 2px;
+            height: fit-content;
         }
         .star-item:hover { transform: scale(1.05); background-color: rgba(180, 83, 9, 0.05); z-index: 10; }
         .star-item.dragging { opacity: 0.5; }
@@ -216,25 +224,26 @@
         .type-minor { color: #3730a3; }
         .type-bad { color: #4b5563; }
 
-        /* 四化標籤 (附著於星曜下方) */
+        /* 四化標籤 (附著於星曜下方，改為直書) */
         .sihua-container {
             display: inline-flex;
             flex-direction: column; /* 垂直排列 */
-            gap: 1px;
-            margin-top: 2px; /* 與文字的距離 */
+            gap: 2px;
+            margin-top: 3px;
             align-items: center;
         }
         
         .sihua-tag {
-            font-size: 0.5rem;
-            padding: 1px 2px;
+            writing-mode: vertical-rl; /* 關鍵修改：直書 */
+            text-orientation: upright; /* 文字正立 */
+            font-size: 0.55rem;
+            padding: 2px 1px;
             border-radius: 2px;
             color: white;
             font-weight: normal;
-            line-height: 1;
-            min-width: 12px;
+            line-height: 1.1;
+            letter-spacing: 1px;
             text-align: center;
-            writing-mode: horizontal-tb; /* 標籤文字橫寫 (如 '祿') */
         }
         .bg-ben { background-color: #15803d; }
         .bg-da { background-color: #1d4ed8; }
@@ -286,6 +295,43 @@
         .layer-tab.active[data-layer="yue"] { background: white; color: #7e22ce; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-color: #e9d5ff; }
         .layer-tab.active[data-layer="ri"] { background: white; color: #c2410c; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-color: #fed7aa; }
 
+        /* 中宮資訊面板樣式 */
+        #centerInfoPanel {
+            flex: 1;
+            width: 100%;
+            overflow-y: auto;
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            z-index: 10;
+        }
+        .info-section-title {
+            font-family: "Noto Serif TC", serif;
+            font-weight: bold;
+            color: #b45309;
+            font-size: 0.95rem;
+            border-bottom: 1px dashed #dcd6cc;
+            padding-bottom: 2px;
+            margin-bottom: 4px;
+            margin-top: 8px;
+        }
+        .info-row {
+            display: flex;
+            align-items: baseline;
+            font-size: 0.85rem;
+            margin-bottom: 2px;
+            line-height: 1.5;
+        }
+        .info-label {
+            width: 4.5em;
+            flex-shrink: 0;
+            color: #57534e;
+            font-weight: 600;
+        }
+        .info-stars {
+            color: #2c2c2c;
+            font-family: "Noto Serif TC", serif;
+        }
+
     </style>
 </head>
 <body class="h-screen flex flex-col md:flex-row overflow-hidden font-sans bg-paper-bg text-ink-main">
@@ -299,7 +345,7 @@
                 <p class="text-xs text-ink-sub mt-1 tracking-wider">專業疊宮・智能排盤</p>
             </div>
             <div class="text-right">
-                <span class="text-[10px] text-gray-400 border px-1 rounded">v3.0</span>
+                <span class="text-[10px] text-gray-400 border px-1 rounded">v4.0</span>
             </div>
         </div>
 
@@ -314,7 +360,7 @@
             </div>
         </div>
 
-        <!-- 操控面板 (縮小高度，讓給備選區) -->
+        <!-- 操控面板 -->
         <div class="p-4 border-b border-paper-border bg-white flex-shrink-0 overflow-y-auto" style="max-height: 35vh;" id="layerControls">
             <!-- 這裡會由 JS 動態生成 -->
         </div>
@@ -341,25 +387,29 @@
     <main class="flex-1 p-2 md:p-6 overflow-auto flex flex-col items-center justify-center bg-paper-bg relative">
         
         <div class="palace-grid shadow-2xl" id="palaceGrid">
-            <!-- 中宮 (匯出入) -->
+            <!-- 中宮 (資訊 + 匯出入) -->
             <div class="center-area">
                 <div class="center-decor"></div>
-                <div class="text-center space-y-4 z-10 w-full max-w-[180px]">
-                    <h2 class="text-xl font-serif font-bold text-accent-gold tracking-widest border-b border-gray-200 pb-2 mb-2">天盤中宮</h2>
-                    
-                    <button onclick="exportData()" class="w-full py-2 bg-white border border-accent-gold text-accent-gold rounded hover:bg-orange-50 text-sm font-serif transition-colors shadow-sm flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        匯出設定 (JSON)
+                
+                <!-- 三方四正與暗合宮資訊 (恢復功能) -->
+                <div id="centerInfoPanel" class="custom-scrollbar">
+                    <div class="text-center text-gray-400 text-sm mt-8">
+                        <p class="font-serif italic">- 請點擊宮位查看 -</p>
+                        <p class="text-xs mt-2">將顯示本宮、三合、暗合資訊</p>
+                    </div>
+                </div>
+
+                <!-- 匯出匯入按鈕 (移至下方) -->
+                <div class="w-full max-w-[180px] z-10 flex gap-2 mt-auto flex-shrink-0">
+                    <button onclick="exportData()" class="flex-1 py-1.5 bg-white border border-accent-gold text-accent-gold rounded hover:bg-orange-50 text-xs font-serif transition-colors shadow-sm flex items-center justify-center" title="匯出設定">
+                        匯出
                     </button>
-                    
-                    <label class="w-full py-2 bg-accent-gold text-white rounded hover:bg-yellow-700 text-sm font-serif cursor-pointer transition-colors shadow-sm flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                        匯入設定
+                    <label class="flex-1 py-1.5 bg-accent-gold text-white rounded hover:bg-yellow-700 text-xs font-serif cursor-pointer transition-colors shadow-sm flex items-center justify-center" title="匯入設定">
+                        匯入
                         <input type="file" id="importFile" class="hidden" accept=".json" onchange="importData(this)">
                     </label>
-
-                    <div id="statusMsg" class="text-xs text-gray-400 h-4 font-sans"></div>
                 </div>
+                <div id="statusMsg" class="text-[10px] text-gray-400 h-4 font-sans text-center mt-1 flex-shrink-0"></div>
             </div>
             <!-- 宮位格 -->
         </div>
@@ -370,6 +420,8 @@
         // --- 核心資料與配置 ---
         const tianganList = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
         const earthBranches = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+        // 用於三合判斷的列表順序
+        const branchesList = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
         
         // 四化表
         const sihuaTable = {
@@ -462,7 +514,7 @@
                 cell.addEventListener('dragleave', () => cell.style.backgroundColor = '');
                 cell.addEventListener('drop', handleDrop);
                 cell.addEventListener('click', () => {
-                    setLayerMing(currentTab, branch);
+                    handlePalaceClick(branch);
                 });
 
                 const header = document.createElement('div');
@@ -508,7 +560,6 @@
             const config = layers[layerKey];
             const data = appState.layers[layerKey];
 
-            // 顏色對應
             const colorMap = {
                 'ben': 'text-green-700', 'da': 'text-blue-700', 'nian': 'text-red-700', 
                 'yue': 'text-purple-700', 'ri': 'text-orange-700'
@@ -550,7 +601,6 @@
                         <div class="grid grid-cols-4 gap-2 mt-2">
                             ${['lu', 'quan', 'ke', 'ji'].map(type => {
                                 const typeLabel = type === 'lu' ? '祿' : type === 'quan' ? '權' : type === 'ke' ? '科' : '忌';
-                                // 對應四化標籤顏色
                                 const badgeColorClass = type === 'lu' ? 'bg-green-600' : type === 'quan' ? 'bg-purple-600' : type === 'ke' ? 'bg-blue-600' : 'bg-red-600';
                                 
                                 return `
@@ -569,7 +619,6 @@
             `;
         }
 
-        // 輔助顯示天干對應的四化提示
         function getSihuaString(t) {
             if(!sihuaTable[t]) return '';
             const s = sihuaTable[t];
@@ -578,28 +627,37 @@
 
         // --- 業務邏輯 ---
 
+        // 處理宮位點擊：設定命宮 + 顯示三合資訊
+        function handlePalaceClick(branch) {
+            // 1. 設定命宮 (功能保留)
+            setLayerMing(currentTab, branch);
+            
+            // 2. 顯示點擊宮位的詳細資訊 (功能恢復)
+            updateCenterInfo(branch);
+
+            // 3. UI 選中效果
+            document.querySelectorAll('.palace-cell').forEach(c => c.classList.remove('selected'));
+            const cell = document.querySelector(`.palace-cell[data-branch="${branch}"]`);
+            if (cell) cell.classList.add('selected');
+        }
+
         function setLayerMing(layerKey, branch) {
             appState.layers[layerKey].mingBranch = branch;
             updatePalaceLabels();
             if (currentTab === layerKey) renderControlPanel();
         }
 
-        // 核心：設定天干並自動填入四化
         function setLayerTiangan(layerKey, tiangan) {
             appState.layers[layerKey].tiangan = tiangan;
-            
             if (tiangan && sihuaTable[tiangan]) {
                 const s = sihuaTable[tiangan];
                 appState.layers[layerKey].lu = s.lu;
                 appState.layers[layerKey].quan = s.quan;
                 appState.layers[layerKey].ke = s.ke;
                 appState.layers[layerKey].ji = s.ji;
-            } else if (tiangan === '') {
-                // 如果清除天干，是否清除四化？這裡選擇保留，以免誤觸
             }
-
-            renderStars(); // 更新盤面上的四化點
-            renderControlPanel(); // 更新面板上的 select 顯示
+            renderStars();
+            renderControlPanel();
         }
 
         function setLayerSihua(layerKey, type, starName) {
@@ -625,6 +683,73 @@
             renderStars();
             updatePalaceLabels();
             renderControlPanel();
+            document.getElementById('centerInfoPanel').innerHTML = '<div class="text-center text-gray-400 text-sm mt-8"><p class="font-serif italic">- 請點擊宮位查看 -</p></div>';
+            document.querySelectorAll('.palace-cell').forEach(c => c.classList.remove('selected'));
+        }
+
+        // --- 三方四正與暗合邏輯 ---
+
+        function updateCenterInfo(clickedBranch) {
+            const panel = document.getElementById('centerInfoPanel');
+            const relations = getRelations(clickedBranch);
+            let html = `
+                <div class="text-center mb-2">
+                    <span class="text-lg font-bold font-serif text-accent-gold border-b-2 border-accent-gold pb-1">${clickedBranch}位 關聯宮位</span>
+                </div>
+            `;
+
+            // Helper: Get stars string
+            const getStars = (branch) => {
+                const stars = starsData
+                    .filter(s => appState.starPositions[s.name] === branch)
+                    .map(s => s.name);
+                return stars.length > 0 ? stars.join('、') : '<span class="text-gray-300 text-xs">無星曜</span>';
+            };
+
+            // 1. 本宮
+            html += `<div class="info-section-title">本宮</div>`;
+            html += `<div class="info-row"><span class="info-label">${clickedBranch}位</span><span class="info-stars">${getStars(clickedBranch)}</span></div>`;
+
+            // 2. 三合
+            html += `<div class="info-section-title">三合宮位</div>`;
+            relations.sanhe.forEach(b => {
+                html += `<div class="info-row"><span class="info-label">${b}位</span><span class="info-stars">${getStars(b)}</span></div>`;
+            });
+
+            // 3. 對宮 (遷移位，三方四正的第四正) - 雖然原需求只說三合暗合，但通常三方"四正"包含對宮
+            const duiGong = getDuiGong(clickedBranch);
+            html += `<div class="info-section-title">對宮 (四正)</div>`;
+             html += `<div class="info-row"><span class="info-label">${duiGong}位</span><span class="info-stars">${getStars(duiGong)}</span></div>`;
+
+            // 4. 暗合
+            html += `<div class="info-section-title">暗合宮位</div>`;
+            html += `<div class="info-row"><span class="info-label">${relations.anhe}位</span><span class="info-stars">${getStars(relations.anhe)}</span></div>`;
+
+            panel.innerHTML = html;
+        }
+
+        function getRelations(branch) {
+            const idx = branchesList.indexOf(branch);
+            // 三合: +4, +8
+            const p1 = branchesList[(idx + 4) % 12];
+            const p2 = branchesList[(idx + 8) % 12];
+            
+            // 暗合 Map
+            const anheMap = {
+                '子': '丑', '丑': '子', '寅': '亥', '亥': '寅',
+                '卯': '戌', '戌': '卯', '辰': '酉', '酉': '辰',
+                '巳': '申', '申': '巳', '午': '未', '未': '午'
+            };
+            
+            return {
+                sanhe: [p1, p2],
+                anhe: anheMap[branch]
+            };
+        }
+
+        function getDuiGong(branch) {
+             const idx = branchesList.indexOf(branch);
+             return branchesList[(idx + 6) % 12];
         }
 
         // --- 渲染邏輯 ---
@@ -642,13 +767,11 @@
                 
                 earthBranches.forEach((branch, idx) => {
                     const branchIdx = earthBranches.indexOf(branch);
-                    // 逆時針排布宮位
                     let offset = (mingIdx - branchIdx + 12) % 12;
                     
                     const name = palaceNamesTemplate[offset];
                     let displayText = name;
                     
-                    // 除了本命顯示全名，其他顯示簡稱
                     if (layerKey !== 'ben') {
                          displayText = config.prefix + name.substring(0, 1);
                          if(name === '命宮') displayText = config.prefix + "命";
@@ -679,6 +802,12 @@
                     if (container) container.appendChild(starEl);
                 }
             });
+            
+            // 如果中宮有選中的宮位，刷新資訊
+            const selected = document.querySelector('.palace-cell.selected');
+            if(selected) {
+                updateCenterInfo(selected.dataset.branch);
+            }
         }
 
         function renderStarPool() {
@@ -687,7 +816,6 @@
 
         function createStarElement(star, isPool) {
             const el = document.createElement('div');
-            // 如果在備選區，使用 star-pool-item 樣式，否則使用 star-item (已改為直書)
             el.className = isPool ? `star-pool-item type-${star.type}` : `star-item type-${star.type}`;
             el.draggable = true;
             el.textContent = star.name;
@@ -706,7 +834,7 @@
                 }
             });
 
-            // 四化標籤
+            // 四化標籤 (僅在盤面上顯示)
             if (!isPool) {
                 const badgeContainer = document.createElement('span');
                 badgeContainer.className = 'sihua-container';
@@ -720,7 +848,7 @@
                         if (lData[type] === star.name) {
                             const badge = document.createElement('span');
                             badge.className = `sihua-tag ${lConfig.bgClass}`;
-                            // 文字處理：本命顯示單字，流運顯示 "年祿"
+                            // 文字：直書模式，雙字會垂直堆疊
                             badge.textContent = layerKey === 'ben' ? map[type] : (lConfig.prefix + map[type]);
                             badgeContainer.appendChild(badge);
                         }
