@@ -104,6 +104,8 @@
         );
 
         // --- 核心引擎：拼音 (Pinyin) 轉 注音 (Zhuyin) ---
+        // 說明：pinyin-pro 庫雖然強大，但有時在 Web 端會回傳數字拼音 (如 ming2)。
+        // 我們這裡實作一個轉換器，強制將拼音轉為台灣標準注音 (ㄅㄆㄇ)。
         const pinyinToZhuyin = (pinyinStr) => {
             if (!pinyinStr) return "";
             
@@ -218,6 +220,7 @@
 
             // --- 輔助函式 ---
 
+            // 解析注音 (分離聲調與本體)
             const parseZhuyin = (zhuyinStr) => {
                 if (!zhuyinStr) return { body: "", tone: "" };
                 const tones = ['ˊ', 'ˇ', 'ˋ', '˙'];
@@ -233,10 +236,12 @@
                 return { body, tone };
             };
 
+            // 獲取注音
             const getZhuyin = (char) => {
                 if (window.pinyinPro) {
                     try {
                         const { pinyin } = window.pinyinPro;
+                        // 請求 'num' 格式 (如 ming2)，再用我們的引擎轉為標準注音
                         const pinyinResult = pinyin(char, { type: 'array', toneType: 'num' }); 
                         if (pinyinResult && pinyinResult[0]) {
                             return pinyinToZhuyin(pinyinResult[0]);
@@ -246,10 +251,14 @@
                 return "";
             };
 
+            // 新增詞彙 (支援多行貼上)
             const handleAddWord = () => {
                 const rawText = inputText.trim();
                 if (!rawText) return;
+                
+                // 依換行符號分割
                 const lines = rawText.split(/\n+/).map(l => l.trim()).filter(l => l);
+
                 const newWords = lines.map((text, index) => {
                     const charArray = text.split('');
                     const charsData = charArray.map((c) => ({
@@ -260,12 +269,15 @@
                     }));
                     return { id: Date.now() + index, text: text, chars: charsData };
                 });
+
                 setWordList([...wordList, ...newWords]);
                 setInputText("");
             };
 
             const handleDeleteWord = (id) => setWordList(wordList.filter(w => w.id !== id));
             const handleClearAll = () => setWordList([]);
+
+            // 側邊欄手動修改注音
             const handleSidebarZhuyinChange = (wordId, charIndex, newValue) => {
                 setWordList(wordList.map(w => {
                     if (w.id === wordId) {
@@ -276,6 +288,8 @@
                     return w;
                 }));
             };
+
+            // 畫布右鍵挖空
             const handleRightClick = (e, wordId, charIndex, type) => {
                 e.preventDefault();
                 setWordList(wordList.map(w => {
@@ -288,10 +302,14 @@
                     return w;
                 }));
             };
+
+            // 畫布雙擊編輯
             const handleDoubleClick = (wordId, charIndex, currentVal, type) => {
                 setEditingId(`${wordId}-${charIndex}-${type}`);
                 setEditValue(currentVal);
             };
+
+            // 儲存編輯
             const saveEdit = (wordId, charIndex, type) => {
                 setWordList(wordList.map(w => {
                     if (w.id === wordId) {
@@ -304,180 +322,157 @@
                 }));
                 setEditingId(null);
             };
+
             const handleKeyDown = (e) => {
+                // 允許 Shift+Enter 換行，僅 Enter 觸發新增
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddWord(); }
             };
+
             const handlePrint = () => window.print();
 
-            // --- 分頁計算 ---
-            const pages = useMemo(() => {
-                const _pages = [];
-                let currentPage = [];
-                let currentColumnHeight = 0;
-                let currentColumns = 1;
-                const PAGE_HEIGHT_MM = 210;
-                const HEADER_HEIGHT_MM = 35; 
-                const PADDING_Y_MM = 30; 
-                const AVAILABLE_HEIGHT_MM = PAGE_HEIGHT_MM - HEADER_HEIGHT_MM - PADDING_Y_MM;
-                const MM_TO_PX = 3.78; 
-                const MAX_COLUMN_HEIGHT_PX = AVAILABLE_HEIGHT_MM * MM_TO_PX;
-                const MAX_COLUMNS = 2;
-
-                wordList.forEach((word, globalIndex) => {
-                    const estimatedHeight = 24 + (word.text.length * charSize) + 40;
-                    if (currentColumnHeight + estimatedHeight > MAX_COLUMN_HEIGHT_PX) {
-                        currentColumns++;
-                        currentColumnHeight = 0;
-                        if (currentColumns > MAX_COLUMNS) {
-                            _pages.push(currentPage);
-                            currentPage = [];
-                            currentColumns = 1;
-                        }
-                    }
-                    currentPage.push({ ...word, globalIndex: globalIndex }); 
-                    currentColumnHeight += estimatedHeight;
-                });
-                if (currentPage.length > 0) _pages.push(currentPage);
-                if (_pages.length === 0) _pages.push([]);
-                return _pages;
-            }, [wordList, charSize]);
-
+            // 樣式參數
             const ZHUYIN_RATIO = 0.42; 
             const TONE_COL_RATIO = 0.35;
 
             return (
                 <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row font-sans text-gray-800">
                     
-                    {/* --- 左側預覽區 --- */}
+                    {/* --- 左側預覽區 (單頁模式) --- */}
                     <div className="flex-1 p-4 overflow-auto flex justify-center bg-gray-200 print:bg-white print:p-0 print:m-0">
-                        <div className="w-full flex flex-col items-center">
-                            
-                            {/* 遍歷每一頁 */}
-                            {pages.map((pageWords, pageIndex) => (
-                                <div 
-                                    key={pageIndex}
-                                    className="bg-white relative box-border mx-auto transition-all duration-300 preview-page print-page print:shadow-none"
-                                    style={{ width: '297mm', height: '210mm', padding: '1.5cm 2cm', fontFamily: '"KaiTi", "BiauKai", "DFKai-SB", serif' }}
-                                >
-                                    {/* 標頭 */}
-                                    <div className="w-full mb-2 border-b-2 border-black pb-2 flex justify-between items-end print:mb-2">
-                                        <h1 className="text-3xl font-bold tracking-widest text-black">{paperTitle}</h1>
-                                        <div className="text-right text-base space-x-8 text-black font-bold">
-                                            <span>班級：__________</span> <span>姓名：__________</span> <span>得分：________</span>
+                        <div 
+                            className="bg-white shadow-2xl print:shadow-none relative box-border mx-auto transition-all duration-300 print-page"
+                            style={{ width: '297mm', height: '210mm', padding: '1.5cm 2cm', fontFamily: '"KaiTi", "BiauKai", "DFKai-SB", serif' }}
+                        >
+                            {/* 標頭 */}
+                            <div className="w-full mb-2 border-b-2 border-black pb-2 flex justify-between items-end print:mb-2">
+                                <h1 className="text-3xl font-bold tracking-widest text-black">{paperTitle}</h1>
+                                <div className="text-right text-base space-x-8 text-black font-bold">
+                                    <span>班級：__________</span> <span>姓名：__________</span> <span>得分：________</span>
+                                </div>
+                            </div>
+
+                            {/* 直書排版區 */}
+                            <div style={{ writingMode: 'vertical-rl', width: '100%', height: 'calc(100% - 4rem)', columnCount: 2, columnGap: '2cm', columnRule: '1px dashed #ccc', paddingTop: '1cm' }}>
+                                {wordList.length === 0 && (
+                                    <div className="text-gray-300 text-xl pt-20 select-none leading-relaxed" style={{textOrientation: 'upright'}}>
+                                        在右側新增詞彙，<br/>
+                                        在左邊滑鼠點右鍵來挖空，<br/>
+                                        記得檢查注音<br/>
+                                        可能會是中國讀音或者破音字
+                                    </div>
+                                )}
+
+                                {wordList.map((word, index) => (
+                                    <div key={word.id} className="inline-block break-inside-avoid ml-10 mb-4" style={{ verticalAlign: 'top' }}>
+                                        
+                                        {/* 單詞區塊 */}
+                                        <div className="flex flex-row items-center gap-2">
+                                            
+                                            {/* 序號 */}
+                                            <span className="font-bold text-black mt-2" style={{ textOrientation: 'upright', fontSize: '16px' }}>
+                                               {index + 1}.
+                                            </span>
+
+                                            {/* 字元組 */}
+                                            <div className="flex flex-row gap-1">
+                                                {word.chars.map((charItem, charIdx) => {
+                                                    const isEditingZhuyin = editingId === `${word.id}-${charIdx}-zhuyin`;
+                                                    const isZhuyinHidden = charItem.hiddenZhuyin || hideZhuyinMode;
+                                                    const isCharHidden = charItem.hiddenChar || hideCharMode;
+                                                    
+                                                    const { body: zhuyinBody, tone: zhuyinTone } = parseZhuyin(charItem.zhuyin);
+                                                    const isNeutral = zhuyinTone === '˙'; // 輕聲偵測
+                                                    const zhuyinWidth = charSize * ZHUYIN_RATIO;
+
+                                                    return (
+                                                        // 直書 Flex Col = 右->左
+                                                        <div key={`${word.id}-${charIdx}`} className="relative flex flex-col" 
+                                                            style={{ height: `${charSize}px`, width: `${charSize + zhuyinWidth}px` }}>
+                                                            
+                                                            {/* 1. 注音區塊 (右) */}
+                                                            <div className="flex transition-colors cursor-pointer hover:bg-blue-50 print:hover:bg-transparent"
+                                                                onContextMenu={(e) => handleRightClick(e, word.id, charIdx, 'zhuyin')}
+                                                                onDoubleClick={() => handleDoubleClick(word.id, charIdx, charItem.zhuyin, 'zhuyin')}
+                                                                style={{
+                                                                    width: `${zhuyinWidth}px`, height: '100%',
+                                                                    border: isZhuyinHidden ? '1px solid black' : '1px solid transparent',
+                                                                    boxSizing: 'border-box',
+                                                                    display: isZhuyinHidden ? 'block' : 'flex', 
+                                                                    flexDirection: 'column', 
+                                                                }}>
+                                                                {isEditingZhuyin ? (
+                                                                    <input autoFocus value={editValue} onChange={(e) => setEditValue(e.target.value)}
+                                                                        onBlur={() => saveEdit(word.id, charIdx, 'zhuyin')}
+                                                                        onKeyDown={(e) => { if(e.key === 'Enter') saveEdit(word.id, charIdx, 'zhuyin'); }}
+                                                                        className="absolute bg-white border border-blue-500 outline-none text-center shadow-lg"
+                                                                        style={{ width: '100px', height: '30px', fontSize: '16px', transform: 'rotate(90deg)', zIndex: 50, top: '30%', right: '-30px' }} />
+                                                                ) : !isZhuyinHidden && (
+                                                                    isNeutral ? (
+                                                                        // 輕聲例外處理：單欄置中，輕聲符號在上
+                                                                        <div style={{ flex: '1', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                            <span style={{
+                                                                                fontSize: `${charSize * 0.25}px`, 
+                                                                                lineHeight: 1.1, writingMode: 'vertical-rl', textOrientation: 'upright', fontFamily: 'inherit', color: '#444'
+                                                                            }}>
+                                                                                <span>˙</span>{zhuyinBody}
+                                                                            </span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        // 一般聲調：分左右兩欄 (Flex Col 右->左)
+                                                                        <>
+                                                                            {/* A. 聲調 (右欄) */}
+                                                                            <div style={{
+                                                                                    flex: `0 0 ${TONE_COL_RATIO * 100}%`, height: '100%',
+                                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative'
+                                                                                }}>
+                                                                                <span style={{
+                                                                                    fontSize: `${charSize * 0.22}px`, 
+                                                                                    textOrientation: 'upright', fontFamily: 'inherit', color: '#444',
+                                                                                    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' // 絕對置中
+                                                                                }}>
+                                                                                    {zhuyinTone}
+                                                                                </span>
+                                                                            </div>
+                                                                            {/* B. 本體 (左欄) */}
+                                                                            <div style={{ flex: '1', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                                <span style={{
+                                                                                    fontSize: `${charSize * 0.25}px`, 
+                                                                                    lineHeight: 1.1, writingMode: 'vertical-rl', textOrientation: 'upright', fontFamily: 'inherit', color: '#444'
+                                                                                }}>
+                                                                                    {zhuyinBody}
+                                                                                </span>
+                                                                            </div>
+                                                                        </>
+                                                                    )
+                                                                )}
+                                                            </div>
+
+                                                            {/* 2. 國字區塊 (左) */}
+                                                            <div className="flex items-center justify-center transition-colors cursor-pointer hover:bg-blue-50 print:hover:bg-transparent"
+                                                                onContextMenu={(e) => handleRightClick(e, word.id, charIdx, 'char')}
+                                                                style={{
+                                                                    width: `${charSize}px`, height: `${charSize}px`,
+                                                                    border: isCharHidden ? '1px solid black' : '1px solid transparent',
+                                                                    boxSizing: 'border-box'
+                                                                }}>
+                                                                <span style={{ 
+                                                                    opacity: isCharHidden ? 0 : 1, fontSize: `${charSize * 0.9}px`,
+                                                                    lineHeight: 1, fontFamily: 'inherit', color: 'black'
+                                                                }}>
+                                                                    {charItem.char}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     </div>
-
-                                    {/* 內容區 */}
-                                    <div style={{ writingMode: 'vertical-rl', width: '100%', height: 'calc(100% - 4rem)', columnCount: 2, columnGap: '2cm', columnRule: '1px dashed #ccc', paddingTop: '1cm' }}>
-                                        {pageWords.length === 0 && pageIndex === 0 && (
-                                            <div className="text-gray-300 text-xl pt-20 select-none leading-relaxed" style={{textOrientation: 'upright'}}>
-                                                在右側新增詞彙，<br/>
-                                                在左邊滑鼠點右鍵來挖空，<br/>
-                                                記得檢查注音<br/>
-                                                可能會是中國讀音或者破音字
-                                            </div>
-                                        )}
-
-                                        {pageWords.map((word) => (
-                                            <div key={word.id} className="inline-block break-inside-avoid ml-10 mb-4" style={{ verticalAlign: 'top' }}>
-                                                <div className="flex flex-row items-center gap-2">
-                                                    <span className="font-bold text-black mt-2" style={{ textOrientation: 'upright', fontSize: '16px' }}>
-                                                    {word.globalIndex + 1}.
-                                                    </span>
-
-                                                    <div className="flex flex-row gap-1">
-                                                        {word.chars.map((charItem, charIdx) => {
-                                                            const isEditingZhuyin = editingId === `${word.id}-${charIdx}-zhuyin`;
-                                                            const isZhuyinHidden = charItem.hiddenZhuyin || hideZhuyinMode;
-                                                            const isCharHidden = charItem.hiddenChar || hideCharMode;
-                                                            const { body: zhuyinBody, tone: zhuyinTone } = parseZhuyin(charItem.zhuyin);
-                                                            const isNeutral = zhuyinTone === '˙'; 
-                                                            const zhuyinWidth = charSize * ZHUYIN_RATIO;
-
-                                                            return (
-                                                                <div key={`${word.id}-${charIdx}`} className="relative flex flex-col" 
-                                                                    style={{ height: `${charSize}px`, width: `${charSize + zhuyinWidth}px` }}>
-                                                                    
-                                                                    <div className="flex transition-colors cursor-pointer hover:bg-blue-50 print:hover:bg-transparent"
-                                                                        onContextMenu={(e) => handleRightClick(e, word.id, charIdx, 'zhuyin')}
-                                                                        onDoubleClick={() => handleDoubleClick(word.id, charIdx, charItem.zhuyin, 'zhuyin')}
-                                                                        style={{
-                                                                            width: `${zhuyinWidth}px`, height: '100%',
-                                                                            border: isZhuyinHidden ? '1px solid black' : '1px solid transparent',
-                                                                            boxSizing: 'border-box',
-                                                                            display: isZhuyinHidden ? 'block' : 'flex', 
-                                                                            flexDirection: 'column', 
-                                                                        }}>
-                                                                        {isEditingZhuyin ? (
-                                                                            <input autoFocus value={editValue} onChange={(e) => setEditValue(e.target.value)}
-                                                                                onBlur={() => saveEdit(word.id, charIdx, 'zhuyin')}
-                                                                                onKeyDown={(e) => { if(e.key === 'Enter') saveEdit(word.id, charIdx, 'zhuyin'); }}
-                                                                                className="absolute bg-white border border-blue-500 outline-none text-center shadow-lg"
-                                                                                style={{ width: '100px', height: '30px', fontSize: '16px', transform: 'rotate(90deg)', zIndex: 50, top: '30%', right: '-30px' }} />
-                                                                        ) : !isZhuyinHidden && (
-                                                                            isNeutral ? (
-                                                                                <div style={{ flex: '1', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                                    <span style={{
-                                                                                        fontSize: `${charSize * 0.25}px`, 
-                                                                                        lineHeight: 1.1, writingMode: 'vertical-rl', textOrientation: 'upright', fontFamily: 'inherit', color: '#444'
-                                                                                    }}>
-                                                                                        <span>˙</span>{zhuyinBody}
-                                                                                    </span>
-                                                                                </div>
-                                                                            ) : (
-                                                                                <>
-                                                                                    <div style={{
-                                                                                            flex: `0 0 ${TONE_COL_RATIO * 100}%`, height: '100%',
-                                                                                            display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative'
-                                                                                        }}>
-                                                                                        <span style={{
-                                                                                            fontSize: `${charSize * 0.22}px`, 
-                                                                                            textOrientation: 'upright', fontFamily: 'inherit', color: '#444',
-                                                                                            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)'
-                                                                                        }}>
-                                                                                            {zhuyinTone}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <div style={{ flex: '1', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                                        <span style={{
-                                                                                            fontSize: `${charSize * 0.25}px`, 
-                                                                                            lineHeight: 1.1, writingMode: 'vertical-rl', textOrientation: 'upright', fontFamily: 'inherit', color: '#444'
-                                                                                        }}>
-                                                                                            {zhuyinBody}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                </>
-                                                                            )
-                                                                        )}
-                                                                    </div>
-
-                                                                    <div className="flex items-center justify-center transition-colors cursor-pointer hover:bg-blue-50 print:hover:bg-transparent"
-                                                                        onContextMenu={(e) => handleRightClick(e, word.id, charIdx, 'char')}
-                                                                        style={{
-                                                                            width: `${charSize}px`, height: `${charSize}px`,
-                                                                            border: isCharHidden ? '1px solid black' : '1px solid transparent',
-                                                                            boxSizing: 'border-box'
-                                                                        }}>
-                                                                        <span style={{ 
-                                                                            opacity: isCharHidden ? 0 : 1, fontSize: `${charSize * 0.9}px`,
-                                                                            lineHeight: 1, fontFamily: 'inherit', color: 'black'
-                                                                        }}>
-                                                                            {charItem.char}
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="absolute bottom-2 left-2 text-[10px] text-gray-400 print:hidden">
-                                        第 {pageIndex + 1} 頁 / 共 {pages.length} 頁
-                                    </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
+                            <div className="absolute bottom-2 left-2 text-[10px] text-gray-400 print:hidden">
+                                * 右鍵：挖空 | 雙擊：修改 | 側欄可手動輸入
+                            </div>
                         </div>
                     </div>
 
