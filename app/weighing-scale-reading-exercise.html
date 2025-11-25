@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>數學教學虛擬磅秤</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f3f4f6;
+            touch-action: manipulation;
+        }
+
+        .hidden-answer {
+            background-color: #1f2937;
+            color: #1f2937;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .hidden-answer:hover {
+            color: #374151;
+        }
+        /* 遮罩層 */
+        .hidden-answer::after {
+            content: "點擊查看答案";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #1f2937;
+            color: #9ca3af;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            transition: opacity 0.2s;
+        }
+        .hidden-answer:hover::after {
+            color: #f3f4f6;
+            background-color: #374151;
+        }
+        
+        .revealed-answer {
+            background-color: #d1fae5;
+            color: #065f46;
+            cursor: pointer;
+            user-select: none; /* 答案顯示時也不選取文字 */
+        }
+        .revealed-answer::after {
+            display: none;
+        }
+
+        .canvas-container {
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
+            border-radius: 50%;
+            background: white;
+            border: 8px solid #e5e7eb;
+            position: relative;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col md:flex-row overflow-hidden">
+
+    <!-- 左側：磅秤顯示區 -->
+    <div class="flex-1 flex flex-col items-center justify-center p-4 bg-blue-50 relative overflow-y-auto">
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-800 mb-4 absolute top-4 left-4">
+            <i class="fas fa-balance-scale text-blue-600 mr-2"></i>認識重量
+        </h1>
+
+        <!-- 磅秤本體 -->
+        <div class="relative">
+            <div class="canvas-container w-[320px] h-[320px] md:w-[500px] md:h-[500px]">
+                <canvas id="scaleCanvas"></canvas>
+            </div>
+            <!-- 指針中心點裝飾 -->
+            <div class="absolute top-1/2 left-1/2 w-4 h-4 bg-red-600 rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-lg z-10 pointer-events-none"></div>
+        </div>
+
+        <!-- 答案顯示區 -->
+        <div class="mt-6 w-full max-w-lg">
+            <div class="text-center text-sm text-gray-500 mb-1">老師可點擊下方黑條查看答案</div>
+            <div id="answerBox" onclick="toggleAnswer()" 
+                 class="hidden-answer text-xl md:text-2xl font-bold py-4 px-6 rounded-lg text-center shadow-md border-2 border-gray-300 min-h-[5rem] flex items-center justify-center">
+                尚未出題
+            </div>
+        </div>
+    </div>
+
+    <!-- 右側：控制面板 -->
+    <div class="w-full md:w-96 bg-white shadow-xl flex flex-col h-[40vh] md:h-full z-20 border-l border-gray-200">
+        <div class="p-6 flex-1 overflow-y-auto">
+            <h2 class="text-xl font-bold text-gray-700 mb-4 flex items-center">
+                <i class="fas fa-sliders-h mr-2"></i>設定面板
+            </h2>
+
+            <!-- 1. 磅秤選擇 -->
+            <div class="mb-4">
+                <label class="block text-sm font-bold text-gray-700 mb-2">1. 選擇磅秤量程</label>
+                <select id="scaleSelect" onchange="updateSettings()" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50">
+                    <option value="1">1 公斤 (中:100g / 小:5g)</option>
+                    <option value="3">3 公斤 (中:100g / 小:10g)</option>
+                    <option value="4">4 公斤 (中:200g / 小:20g)</option>
+                    <option value="5">5 公斤 (中:500g / 小:50g)</option>
+                    <option value="10">10 公斤 (中:1kg / 小:100g)</option>
+                </select>
+            </div>
+
+            <!-- 2. 模式選擇 -->
+            <div class="mb-4">
+                <label class="block text-sm font-bold text-gray-700 mb-2">2. 出題難度</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="setMode('int')" id="btn-mode-int" class="mode-btn p-2 text-sm border rounded hover:bg-blue-50 transition bg-blue-100 border-blue-500 text-blue-700 font-bold">整數/大刻度</button>
+                    <button onclick="setMode('mid')" id="btn-mode-mid" class="mode-btn p-2 text-sm border rounded hover:bg-blue-50 transition bg-white border-gray-300 text-gray-600">中刻度</button>
+                    <button onclick="setMode('small')" id="btn-mode-small" class="mode-btn p-2 text-sm border rounded hover:bg-blue-50 transition bg-white border-gray-300 text-gray-600">小刻度</button>
+                </div>
+            </div>
+
+            <!-- 3. 計時設定 -->
+            <div class="mb-6">
+                <label class="block text-sm font-bold text-gray-700 mb-2">3. 倒數秒數</label>
+                <select id="timerSelect" class="w-full p-2 border border-gray-300 rounded-lg bg-gray-50">
+                    <option value="10">10 秒</option>
+                    <option value="20">20 秒</option>
+                    <option value="30">30 秒</option>
+                    <option value="40">40 秒</option>
+                    <option value="50">50 秒</option>
+                    <option value="60">60 秒 (1分鐘)</option>
+                </select>
+            </div>
+
+            <hr class="border-gray-200 mb-6">
+
+            <!-- 資訊顯示區 -->
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="bg-indigo-50 p-4 rounded-xl text-center border border-indigo-100">
+                    <div class="text-xs text-indigo-500 font-bold uppercase tracking-wider mb-1">中籤座號</div>
+                    <div id="lotteryNum" class="text-4xl font-black text-indigo-600 h-10 flex items-center justify-center">--</div>
+                </div>
+                <div class="bg-emerald-50 p-4 rounded-xl text-center border border-emerald-100">
+                    <div class="text-xs text-emerald-500 font-bold uppercase tracking-wider mb-1">剩餘時間</div>
+                    <div id="timerDisplay" class="text-4xl font-mono font-black text-emerald-600 h-10 flex items-center justify-center">--</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-4 bg-gray-50 border-t border-gray-200">
+            <button onclick="startActivity()" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold py-4 px-6 rounded-xl shadow-lg transform active:scale-95 transition flex items-center justify-center gap-3">
+                <i class="fas fa-dice"></i>
+                開始抽籤與出題
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- 設定與全域變數 ---
+        const canvas = document.getElementById('scaleCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let currentMode = 'int';
+        let currentWeight = 0;       // 目前的目標重量 (用於答案)
+        let displayWeight = 0;       // 目前的指針顯示重量 (用於動畫)
+        let scaleType = 1;
+        
+        let timerInterval = null;
+        let lotteryInterval = null;
+        let animationFrameId = null;
+
+        // 磅秤參數設定
+        const SCALE_CONFIGS = {
+            1: { max: 1000, mid: 100, small: 5 },
+            3: { max: 3000, mid: 100, small: 10 },
+            4: { max: 4000, mid: 200, small: 20 },
+            5: { max: 5000, mid: 500, small: 50 },
+            10: { max: 10000, mid: 1000, small: 100 }
+        };
+
+        // --- 初始化 ---
+        function initCanvas() {
+            const container = canvas.parentElement;
+            const size = container.clientWidth;
+            const dpr = window.devicePixelRatio || 1;
+            
+            canvas.width = size * dpr;
+            canvas.height = size * dpr;
+            canvas.style.width = `${size}px`;
+            canvas.style.height = `${size}px`;
+            
+            ctx.scale(dpr, dpr);
+            
+            drawScale(displayWeight);
+        }
+
+        window.addEventListener('resize', initCanvas);
+        window.onload = initCanvas;
+
+        // --- 核心繪圖邏輯 ---
+        function drawScale(weightToDraw) {
+            const config = SCALE_CONFIGS[scaleType];
+            const size = canvas.clientWidth;
+            const center = size / 2;
+            const radius = size * 0.45;
+            
+            ctx.clearRect(0, 0, size, size);
+
+            const totalSteps = config.max / config.small;
+            
+            for (let i = 0; i <= totalSteps; i++) {
+                const weightVal = i * config.small;
+                
+                // 角度計算：0度為上方 ( -0.5 PI )
+                const angle = (weightVal / config.max) * 2 * Math.PI - 0.5 * Math.PI;
+                
+                let len, width, color;
+                let isLabel = false;
+
+                // 預設樣式 (小刻度)
+                len = radius * 0.06;
+                width = 1;
+                color = '#9ca3af'; // 淺灰
+
+                // --- 刻度樣式邏輯 ---
+                
+                if (weightVal % 1000 === 0) {
+                    // 1. 整公斤 (最高優先級) - 紅色長粗線
+                    len = radius * 0.15;
+                    width = 4;
+                    color = '#ef4444'; 
+                    isLabel = true; 
+                } else {
+                    // 根據不同磅秤類型客製化刻度
+                    const type = String(scaleType);
+                    
+                    if (type === '1') {
+                        // 1公斤秤
+                        if (weightVal % 100 === 0) {
+                            // 100g (中刻度)
+                            len = radius * 0.12; 
+                            width = 2; 
+                            color = '#374151'; // 深灰
+                            isLabel = true; // 1kg秤每100g標字
+                        } else if (weightVal % 50 === 0) {
+                            // 50g (新規則: 粗體較長線)
+                            len = radius * 0.10; 
+                            width = 2; 
+                            color = '#4b5563'; 
+                        }
+                    } else if (['3', '4', '5'].includes(type)) {
+                        // 3, 4, 5公斤秤
+                        if (weightVal % 500 === 0) {
+                            // 500g (新規則: 黑色粗長線，與每公斤刻度同長)
+                            len = radius * 0.15; 
+                            width = 3; 
+                            color = '#1f2937'; // 黑色 (接近黑)
+                        } else if (weightVal % config.mid === 0) {
+                            // 原有的中刻度 (如4kg的200g, 3kg的100g)
+                            len = radius * 0.10; 
+                            width = 2; 
+                            color = '#374151'; 
+                        } else if (weightVal % 50 === 0) {
+                            // 50g (新規則: 粗體線但長度不變)
+                            // 注意: 4kg秤小刻度20g，碰不到50g，這裡只對3kg和5kg有效
+                            len = radius * 0.06; // 長度不變 (同小刻度)
+                            width = 2.5; // 加粗
+                            color = '#4b5563'; 
+                        }
+                    } else if (type === '10') {
+                        // 10公斤秤
+                        if (weightVal % 500 === 0) {
+                            // 500g (新規則: 粗體較長線)
+                            len = radius * 0.12; 
+                            width = 3; 
+                            color = '#374151'; 
+                        } else if (weightVal % config.mid === 0) {
+                            // 1000g已經在最上面處理了，這裡是備用或特殊中刻度
+                            len = radius * 0.10; 
+                            width = 2; 
+                            color = '#374151'; 
+                        }
+                    }
+                }
+
+                // 畫線
+                const startX = center + (radius - len) * Math.cos(angle);
+                const startY = center + (radius - len) * Math.sin(angle);
+                const endX = center + radius * Math.cos(angle);
+                const endY = center + radius * Math.sin(angle);
+
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = width;
+                ctx.stroke();
+
+                // 畫數字
+                if (isLabel) {
+                    let currentTextRadius = radius - len - 25;
+                    
+                    const fontSize = scaleType == 1 ? size * 0.045 : size * 0.055;
+                    ctx.font = `bold ${fontSize}px "Noto Sans TC"`;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillStyle = "#1f2937";
+                    
+                    let labelText = "";
+                    const isMax = weightVal === config.max;
+
+                    if (scaleType == 1) {
+                         // 1kg秤
+                         if (weightVal === 0) labelText = "0";
+                         else if (isMax) labelText = "1kg";
+                         else labelText = weightVal;
+                    } else {
+                        // 其他秤顯示 kg
+                        if (weightVal === 0) labelText = "0";
+                        else if (isMax) labelText = (weightVal / 1000) + "kg";
+                        else labelText = weightVal / 1000;
+                    }
+
+                    // 如果是最大刻度 (例如 3kg)，位置往下移 (半徑縮小) 以避開 0
+                    // 這樣 0 會在上面，最大秤重會在 0 的下方
+                    if (isMax) {
+                        currentTextRadius -= (fontSize * 1.2);
+                    }
+
+                    const textX = center + currentTextRadius * Math.cos(angle);
+                    const textY = center + currentTextRadius * Math.sin(angle);
+                    
+                    ctx.fillText(labelText, textX, textY);
+                }
+            }
+
+            // 2. 繪製指針
+            drawPointer(weightToDraw, config.max, center, radius);
+        }
+
+        function drawPointer(weight, maxWeight, center, radius) {
+            const percentage = weight / maxWeight;
+            const rotation = percentage * 2 * Math.PI;
+
+            ctx.save();
+            ctx.translate(center, center); 
+            ctx.rotate(rotation);          
+
+            // 陰影
+            ctx.shadowColor = "rgba(0,0,0,0.3)";
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+
+            // 紅色指針
+            ctx.beginPath();
+            ctx.moveTo(-4, 0); 
+            ctx.lineTo(0, -radius + 15); 
+            ctx.lineTo(4, 0);
+            ctx.lineTo(0, 10); 
+            ctx.fillStyle = "#dc2626";
+            ctx.fill();
+
+            ctx.restore();
+
+            // 中心鉚釘
+            ctx.beginPath();
+            ctx.arc(center, center, 6, 0, Math.PI * 2);
+            ctx.fillStyle = "#b91c1c";
+            ctx.fill();
+        }
+
+        // --- 動畫相關 ---
+        
+        function animateToWeight(target) {
+            const startWeight = displayWeight;
+            const diff = target - startWeight;
+            
+            const distance = Math.abs(diff);
+            const duration = Math.min(800, Math.max(400, distance / 2)); 
+            
+            const startTime = performance.now();
+
+            function loop(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                const ease = 1 - Math.pow(1 - progress, 3);
+                
+                displayWeight = startWeight + (diff * ease);
+                
+                if (progress >= 1) displayWeight = target;
+
+                drawScale(displayWeight);
+
+                if (progress < 1) {
+                    animationFrameId = requestAnimationFrame(loop);
+                }
+            }
+
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animationFrameId = requestAnimationFrame(loop);
+        }
+
+        // --- 互動邏輯 ---
+
+        function updateSettings() {
+            scaleType = document.getElementById('scaleSelect').value;
+            currentWeight = 0;
+            displayWeight = 0;
+            drawScale(0);
+            resetAnswer("尚未出題");
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.className = "mode-btn p-2 text-sm border rounded hover:bg-blue-50 transition bg-white border-gray-300 text-gray-600";
+            });
+            const activeBtn = document.getElementById(`btn-mode-${mode}`);
+            activeBtn.className = "mode-btn p-2 text-sm border rounded hover:bg-blue-50 transition bg-blue-100 border-blue-500 text-blue-700 font-bold";
+        }
+
+        function startActivity() {
+            if (timerInterval) clearInterval(timerInterval);
+            if (lotteryInterval) clearInterval(lotteryInterval);
+
+            const config = SCALE_CONFIGS[scaleType];
+            let step;
+            
+            if (currentMode === 'int') {
+                if (scaleType == 1) step = 100;
+                else step = 1000;
+            } else if (currentMode === 'mid') {
+                step = config.mid;
+            } else {
+                step = config.small;
+            }
+
+            const maxSteps = config.max / step;
+            const randomStep = Math.floor(Math.random() * maxSteps) + 1;
+            let newTargetWeight = randomStep * step;
+
+            if (newTargetWeight > config.max) newTargetWeight = config.max;
+            
+            currentWeight = newTargetWeight;
+
+            const ansText = formatWeight(currentWeight);
+            resetAnswer(ansText);
+
+            animateToWeight(currentWeight);
+
+            const lotteryEl = document.getElementById('lotteryNum');
+            let spinCount = 0;
+            lotteryInterval = setInterval(() => {
+                lotteryEl.innerText = Math.floor(Math.random() * 30) + 1;
+                spinCount++;
+                if (spinCount > 15) {
+                    clearInterval(lotteryInterval);
+                    const finalNum = Math.floor(Math.random() * 30) + 1;
+                    lotteryEl.innerText = finalNum;
+                    lotteryEl.classList.add('scale-125', 'text-red-600');
+                    setTimeout(() => lotteryEl.classList.remove('scale-125', 'text-red-600'), 300);
+                }
+            }, 50);
+
+            const timeSet = parseInt(document.getElementById('timerSelect').value);
+            let timeLeft = timeSet;
+            const timerEl = document.getElementById('timerDisplay');
+            
+            timerEl.innerText = timeLeft;
+            timerEl.className = "text-4xl font-mono font-black text-emerald-600 h-10 flex items-center justify-center"; 
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerEl.innerText = timeLeft;
+
+                if (timeLeft <= 5) {
+                    timerEl.className = "text-4xl font-mono font-black text-red-600 animate-pulse h-10 flex items-center justify-center"; 
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    timerEl.innerText = "時間到";
+                }
+            }, 1000);
+        }
+
+        // --- 輔助功能 ---
+        
+        function formatWeight(g) {
+            const kg = Math.floor(g / 1000);
+            const remainderG = g % 1000;
+
+            const part1 = `${g}公克`;
+            let part2 = "";
+
+            if (kg > 0) {
+                part2 += `${kg}公斤`;
+                if (remainderG > 0) {
+                    part2 += `${remainderG}公克`;
+                }
+            } else {
+                part2 = `${remainderG}公克`;
+            }
+
+            return `${part1} / ${part2}`;
+        }
+
+        function toggleAnswer() {
+            const box = document.getElementById('answerBox');
+            if (box.innerText === "尚未出題") return;
+
+            if (box.classList.contains('hidden-answer')) {
+                box.classList.remove('hidden-answer');
+                box.classList.add('revealed-answer');
+            } else {
+                box.classList.remove('revealed-answer');
+                box.classList.add('hidden-answer');
+            }
+        }
+
+        function resetAnswer(text) {
+            const box = document.getElementById('answerBox');
+            box.classList.remove('revealed-answer');
+            box.classList.add('hidden-answer');
+            if (text) box.innerText = text;
+        }
+
+        initCanvas();
+    </script>
+</body>
+</html>
