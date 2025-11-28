@@ -29,7 +29,8 @@
             height: 100vh;
             overflow: hidden;
             user-select: none;
-            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%23FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>') 12 12, crosshair;
+            /* 將鼠標顏色從白色改為黑色 (%23FFF -> %23000) */
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%23000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>') 12 12, crosshair;
         }
 
         /* 背景裝飾 - 雲朵 */
@@ -160,7 +161,7 @@
             position: absolute;
             bottom: -120px;
             border-radius: 50%;
-            cursor: pointer;
+            cursor: inherit; /* 改為繼承，讓它維持靶心游標，不要變成手指 */
             /* 讓泡泡有點透明感和立體高光 */
             box-shadow: 
                 inset 10px 10px 20px rgba(255,255,255,0.5),
@@ -233,9 +234,29 @@
             100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
         }
 
-        @keyframes rise {
-            0% { transform: translateY(0) rotate(0deg); }
-            100% { transform: translateY(-800px) rotate(20deg); opacity: 0; }
+        /* 上升動畫 - 路徑1 (S型搖擺) */
+        @keyframes rise-1 {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            25% { transform: translate(30px, -200px) rotate(5deg); }
+            50% { transform: translate(-20px, -400px) rotate(-5deg); }
+            75% { transform: translate(10px, -600px) rotate(2deg); }
+            100% { transform: translate(0, -800px) rotate(10deg); opacity: 0; }
+        }
+
+        /* 上升動畫 - 路徑2 (左飄) */
+        @keyframes rise-2 {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(-40px, -250px) rotate(-5deg); }
+            66% { transform: translate(20px, -500px) rotate(5deg); }
+            100% { transform: translate(-10px, -800px) rotate(0deg); opacity: 0; }
+        }
+
+        /* 上升動畫 - 路徑3 (右飄) */
+        @keyframes rise-3 {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            40% { transform: translate(20px, -300px) rotate(3deg); }
+            70% { transform: translate(40px, -550px) rotate(6deg); }
+            100% { transform: translate(0px, -800px) rotate(0deg); opacity: 0; }
         }
         
         /* 浮動文字 */
@@ -467,8 +488,9 @@
             const maxLeft = 900 - size - 40;
             bubble.style.left = `${Math.floor(Math.random() * maxLeft) + 20}px`;
 
-            // 設定 CSS Variable 給動畫用，這裡簡單直接用 style
-            bubble.style.animation = `rise ${currentRiseSpeed}s linear forwards`;
+            // 設定隨機的上升動畫 (1~3種路徑)
+            const animType = Math.floor(Math.random() * 3) + 1;
+            bubble.style.animation = `rise-${animType} ${currentRiseSpeed}s linear forwards`;
 
             bubble.addEventListener('mousedown', handleBubbleClick);
             bubble.addEventListener('animationend', () => {
