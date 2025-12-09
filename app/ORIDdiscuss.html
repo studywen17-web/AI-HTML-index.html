@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ORID 教師觀課與議課矩陣 (v7 平板友善優化版)</title>
+    <title>ORID 教師觀課與議課矩陣 (最終版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {
@@ -116,7 +116,7 @@
         .image-wrapper.selected { border: 2px solid #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
         .image-wrapper img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
         .resize-handle {
-            position: absolute; bottom: 0; right: 0; width: 30px; height: 30px; /* 加大觸控區 */
+            position: absolute; bottom: 0; right: 0; width: 30px; height: 30px;
             background: linear-gradient(135deg, transparent 50%, #3b82f6 50%);
             cursor: nwse-resize; z-index: 41;
         }
@@ -138,7 +138,7 @@
             cursor: pointer; white-space: normal; word-break: break-word; overflow-y: auto;
         }
 
-        /* --- 6. UI 工具列 (平板優化：增大按鈕) --- */
+        /* --- 6. UI 工具列 --- */
         #input-toolbar {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
             width: 85%; max-width: 800px;
@@ -147,7 +147,7 @@
             z-index: 200; border: 1px solid #e2e8f0; display: flex; flex-direction: column;
         }
         #draw-toolbar {
-            position: fixed; top: 20px; right: 20px; width: 60px; /* 稍微加寬 */
+            position: fixed; top: 20px; right: 20px; width: 60px;
             background: rgba(255, 255, 255, 0.95); border-radius: 8px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 200; border: 1px solid #e2e8f0;
             display: flex; flex-direction: column; align-items: center;
@@ -156,7 +156,6 @@
         
         .toolbar-handle { cursor: grab; padding: 10px 0; background: #f1f5f9; width: 100%; text-align: center; font-size: 0.8rem; }
         
-        /* 增大按鈕至 44px (觸控友善) */
         .draw-btn { 
             width: 44px; height: 44px; margin: 4px; border-radius: 8px; 
             display: flex; align-items: center; justify-content: center; 
@@ -182,13 +181,11 @@
 
     <canvas id="drawing-canvas"></canvas>
 
-    <!-- 放大浮動視窗 -->
     <div id="zoom-overlay" class="hidden" onclick="this.classList.add('hidden')">
         <span class="content"></span>
         <div class="absolute bottom-2 right-2 text-xs text-slate-400 font-normal">(點擊關閉)</div>
     </div>
 
-    <!-- 右鍵選單 -->
     <div id="context-menu">
         <div class="menu-item" onclick="toggleCardZoom()"><span class="text-blue-500 font-bold">🔍 放大檢視 (1.5x)</span></div>
         <hr class="my-1 border-slate-200">
@@ -244,7 +241,7 @@
         <div class="matrix-cell" id="cell-3-3" data-dim="3" data-orid="3"></div>
     </div>
 
-    <!-- 手繪工具列 (浮動) -->
+    <!-- 手繪工具列 -->
     <div id="draw-toolbar">
         <div class="toolbar-handle text-xs text-slate-500" id="draw-handle">🎨 工具</div>
         <div class="flex flex-col items-center p-2 gap-2">
@@ -254,7 +251,6 @@
             
             <div class="w-full h-px bg-slate-200 my-1"></div>
             
-            <!-- 顏色選單 (更換黑色為黃色，新增綠色) -->
             <div class="flex gap-2 flex-wrap justify-center w-full px-1">
                 <div class="color-dot bg-red-500 active" onclick="setPenColor('#ef4444', this)" title="紅"></div>
                 <div class="color-dot bg-blue-500" onclick="setPenColor('#3b82f6', this)" title="藍"></div>
@@ -264,7 +260,6 @@
             
             <div class="w-full h-px bg-slate-200 my-1"></div>
             
-            <!-- 新增復原按鈕 (Undo) -->
             <button class="draw-btn" onclick="undoDraw()" title="復原 (Undo)">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -293,10 +288,17 @@
         </div>
         <div class="p-4 flex flex-wrap gap-2 items-center bg-white rounded-b-xl">
             <input type="text" id="input-text" class="flex-grow px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="輸入內容..." autocomplete="off">
-            <button onclick="simulateAI()" class="bg-purple-100 text-purple-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition">AI判讀</button>
+            <!-- 移除 AI 按鈕 -->
             <div class="flex gap-1">
                 <select id="sel-dim" class="px-2 py-2 border border-slate-300 rounded-lg bg-slate-50 text-xs w-24"><option value="" disabled selected>項度</option><option value="0">教材與課程</option><option value="1">教學者與教法</option><option value="2">學生與學習</option><option value="3">情境與環境</option></select>
-                <select id="sel-orid" class="px-2 py-2 border border-slate-300 rounded-lg bg-slate-50 text-xs w-20"><option value="" disabled selected>ORID</option><option value="0">O</option><option value="1">R</option><option value="2">I</option><option value="3">D</option></select>
+                <!-- 更新 ORID 選單 -->
+                <select id="sel-orid" class="px-2 py-2 border border-slate-300 rounded-lg bg-slate-50 text-xs w-32">
+                    <option value="" disabled selected>ORID</option>
+                    <option value="0">O - 客觀事實</option>
+                    <option value="1">R - 感受反應</option>
+                    <option value="2">I - 詮釋意義</option>
+                    <option value="3">D - 決定行動</option>
+                </select>
             </div>
             <button id="btn-confirm" onclick="addNoteBtnClick()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow-md active:scale-95 text-sm transition-colors">確認</button>
         </div>
@@ -320,7 +322,6 @@
         const MAX_HISTORY = 20;
 
         function resizeCanvas() { 
-            // 調整大小時保留內容 (簡單版：可能會被清空，這裡為了效能暫不重繪)
             canvas.width = window.innerWidth; 
             canvas.height = window.innerHeight; 
         }
@@ -342,21 +343,25 @@
                     ctx.drawImage(img, 0, 0);
                 };
             } else {
-                // 如果空了，就清空
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
         }
 
-        // 拖曳 & 縮放
+        // 拖曳 & 縮放 (修復平板拖曳問題的核心邏輯)
         function makeDraggable(element, handle, isResize = false) {
             let isDragging = false;
             let startX, startY, initialValX, initialValY;
 
             const start = (e) => {
+                if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select') || e.target.closest('label')) return;
+                
+                if (e.type === 'mousedown' && e.button !== 0) return;
+
                 if(isResize) e.stopPropagation();
-                if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
                 
                 if (element.classList.contains('maximized')) return;
+
+                if(e.cancelable) e.preventDefault();
 
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -376,12 +381,11 @@
                     initialValX = rect.left;
                     initialValY = rect.top;
                 }
-                if(e.type === 'touchstart') document.body.style.overflow = 'hidden'; 
             };
 
             const move = (e) => {
                 if (!isDragging) return;
-                e.preventDefault(); 
+                e.preventDefault();
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 const clientY = e.touches ? e.touches[0].clientY : e.clientY;
                 const dx = clientX - startX;
@@ -395,13 +399,14 @@
                     element.style.top = `${initialValY + dy}px`;
                 }
             };
-            const end = () => { isDragging = false; document.body.style.overflow = ''; };
+            const end = () => { isDragging = false; };
 
             handle.addEventListener('mousedown', start);
-            handle.addEventListener('touchstart', start, { passive: false });
             document.addEventListener('mousemove', move);
-            document.addEventListener('touchmove', move, { passive: false });
             document.addEventListener('mouseup', end);
+
+            handle.addEventListener('touchstart', start, { passive: false });
+            document.addEventListener('touchmove', move, { passive: false });
             document.addEventListener('touchend', end);
         }
 
@@ -419,7 +424,6 @@
                 document.body.classList.add('drawing-mode');
                 ctx.globalCompositeOperation = (mode === 'eraser') ? 'destination-out' : 'source-over';
                 ctx.lineWidth = (mode === 'eraser') ? 20 : penSize;
-                // 透明度調整為 0.7 (70%)
                 ctx.globalAlpha = (mode === 'eraser') ? 1.0 : 0.7;
                 ctx.strokeStyle = penColor;
                 ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -431,21 +435,21 @@
             el.classList.add('active');
             if (drawMode !== 'eraser') { 
                 ctx.strokeStyle = color; 
-                ctx.globalAlpha = 0.7; // 確保切換顏色時保持 70% 透明
+                ctx.globalAlpha = 0.7; 
                 setDrawMode('pen'); 
             }
         }
         function clearCanvas() { 
             if(confirm('清除所有畫布內容？(不可復原)')) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height); 
-                undoStack = []; // 清空歷史
+                undoStack = []; 
             }
         }
 
         function startDrawing(e) { 
             if (drawMode === 'pointer') return; 
             isDrawing = true; 
-            saveState(); // 開始畫之前存檔，以便 Undo
+            saveState(); 
             const pos = getPos(e); 
             ctx.beginPath(); ctx.moveTo(pos.x, pos.y); e.preventDefault(); 
         }
@@ -502,10 +506,8 @@
                 selectImage(this);
             });
 
-            // 雙擊放大邏輯修正
             wrapper.addEventListener('dblclick', function() { 
                 if (this.classList.contains('maximized')) {
-                    // 還原
                     this.classList.remove('maximized');
                     if (this.dataset.prevLeft) {
                         this.style.left = this.dataset.prevLeft;
@@ -515,12 +517,10 @@
                         this.style.transform = 'none';
                     }
                 } else {
-                    // 記錄目前位置
                     this.dataset.prevLeft = this.style.left;
                     this.dataset.prevTop = this.style.top;
                     this.dataset.prevWidth = this.style.width;
                     this.dataset.prevHeight = this.style.height;
-                    
                     this.classList.add('maximized');
                 }
             });
@@ -613,7 +613,6 @@
             note.addEventListener('click', handleNoteClick);
             note.addEventListener('dblclick', handleNoteDblClick);
             note.addEventListener('contextmenu', handleContextMenu);
-            // 觸控拖曳支援 (簡單版，防止預設事件)
             note.addEventListener('touchstart', function(e) { if(drawMode==='pointer') e.stopPropagation(); }, {passive: false});
 
             targetCell.appendChild(note);
@@ -814,16 +813,6 @@
             reader.readAsText(file);
         }
         function showToast(msg) { const t = document.getElementById("toast"); t.innerText = msg; t.className = "show"; setTimeout(() => t.className = "", 3000); }
-        function simulateAI() {
-            const input = document.getElementById("input-text").value;
-            if (!input.trim()) { showToast("請輸入內容"); return; }
-            const btn = event.target; const txt = btn.innerText; btn.innerText = "...";
-            setTimeout(() => {
-                document.getElementById("sel-dim").value = Math.floor(Math.random() * 4);
-                document.getElementById("sel-orid").value = Math.floor(Math.random() * 4);
-                btn.innerText = txt; showToast("AI 已分類");
-            }, 600);
-        }
     </script>
 </body>
 </html>
